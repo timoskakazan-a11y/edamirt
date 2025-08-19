@@ -1,0 +1,5 @@
+{
+  "name": "Edamirt Food Delivery",
+  "description": "A modern and visually appealing food delivery application that allows users to browse products, add them to a cart, and checkout. The application integrates with Airtable to store customer information.",
+  "requestFramePermissions": []
+}
