@@ -158,8 +158,8 @@ export const createOrder = async (userId: string, cartItems: CartItem[], total: 
     return records[0];
 };
 
-export const getUserActiveOrder = async (userName: string): Promise<Order | null> => {
-    const formula = `AND(FIND('${userName}', ARRAYJOIN({Table 1})), AND({статус} != 'доставлен', {статус} != 'отменен'))`;
+export const getUserActiveOrder = async (userId: string): Promise<Order | null> => {
+    const formula = `AND(FIND('${userId}', {Table 1}), AND({статус} != 'доставлен', {статус} != 'отменен'))`;
     const response = await fetch(`${ORDERS_BASE_URL}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1&sort%5B0%5D%5Bfield%5D=дата%20заказа&sort%5B0%5D%5Bdirection%5D=desc`, { headers: commonHeaders });
 
     if (!response.ok) return null;
@@ -182,8 +182,8 @@ export const getUserActiveOrder = async (userName: string): Promise<Order | null
     };
 };
 
-export const getAssignedOrderForEmployee = async (employeeName: string): Promise<FullOrderDetails | null> => {
-    const formula = `AND(FIND('${employeeName}', ARRAYJOIN({работники})), AND({статус} != 'доставлен', {статус} != 'отменен'))`;
+export const getAssignedOrderForEmployee = async (employeeId: string): Promise<FullOrderDetails | null> => {
+    const formula = `AND(FIND('${employeeId}', {работники}), AND({статус} != 'доставлен', {статус} != 'отменен'))`;
     const response = await fetch(`${ORDERS_BASE_URL}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`, { headers: commonHeaders });
 
     if (!response.ok) return null;

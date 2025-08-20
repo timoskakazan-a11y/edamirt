@@ -37,7 +37,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     try {
-      const order = await getUserActiveOrder(user.name);
+      const order = await getUserActiveOrder(user.id);
       
       if (order && order.status === 'доставлен' && !reviewableOrder) {
           const fullDetails = await getFullOrderDetails(order.id);

@@ -29,8 +29,7 @@ const EmployeeFlow: React.FC = () => {
   const fetchActiveOrder = useCallback(async () => {
     if (!user) return;
     try {
-        // CRITICAL FIX: Pass user.name for a reliable lookup
-        const order = await getAssignedOrderForEmployee(user.name);
+        const order = await getAssignedOrderForEmployee(user.id);
         setActiveOrder(order);
 
         if (order && status !== 'delivering') {
@@ -97,7 +96,7 @@ const EmployeeFlow: React.FC = () => {
             setStatus('online'); // Go back to looking for new orders
         } else {
             // After updating, refetch the order to get latest data
-            const updatedOrder = await getAssignedOrderForEmployee(user.name);
+            const updatedOrder = await getAssignedOrderForEmployee(user.id);
             setActiveOrder(updatedOrder);
         }
     } catch (err) {
