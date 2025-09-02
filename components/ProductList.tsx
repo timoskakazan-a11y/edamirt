@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Product } from '../types';
 import ProductCard from './ProductCard';
@@ -103,7 +104,7 @@ const ProductList: React.FC<ProductListProps> = ({ onProductClick }) => {
       </div>
       
       {filteredProducts.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredProducts.map(product => (
             <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
           ))}

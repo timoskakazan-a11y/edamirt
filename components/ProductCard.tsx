@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { Product } from '../types';
 import { useCart } from '../contexts/CartContext';
 import { useFavorites } from '../contexts/FavoritesContext';
@@ -8,7 +8,6 @@ import PlusIcon from './icons/PlusIcon';
 import MinusIcon from './icons/MinusIcon';
 import StarIcon from './icons/StarIcon';
 import HeartIcon from './icons/HeartIcon';
-import BarcodeIcon from './icons/BarcodeIcon';
 
 interface ProductCardProps {
   product: Product;
@@ -18,14 +17,13 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product, onProductClick }) => {
   const { cartItems, addToCart, updateQuantity } = useCart();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
-  const [isImageLoaded, setIsImageLoaded] = useState(false);
   
   const cartItem = cartItems.find(item => item.id === product.id);
-  const quantity = cartItem ? cartItem.quantity : 0;
+  const quantity = cartItem ? cartItem.quantity : null;
   const isProdFavorite = isFavorite(product.id);
 
   const isOutOfStock = product.availableStock <= 0;
-  const isMaxStockReached = quantity >= product.availableStock;
+  const isMaxStockReached = quantity !== null && quantity >= product.availableStock;
 
   const hasDiscount = product.discount && product.discount > 0;
   const isWeightBased = product.weightStatus === 'на развес' && product.pricePerKg;
@@ -67,22 +65,29 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onProductClick }) =>
   return (
     <div className="bg-white rounded-2xl shadow-brand overflow-hidden flex flex-col transition-all duration-300 border border-transparent hover:border-slate-200 hover:shadow-lg">
        <div className="relative cursor-pointer" onClick={() => onProductClick(product)}>
-        <div className="overflow-hidden h-40 relative bg-slate-200">
-          {!isImageLoaded && <div className="absolute inset-0 bg-slate-200 animate-pulse"></div>}
-          <img
-              className={`w-full h-full object-cover transition-opacity duration-500 ${isImageLoaded ? 'opacity-100' : 'opacity-0'}`} 
-              src={product.imageUrl} 
-              alt={product.name}
-              onLoad={() => setIsImageLoaded(true)}
-              loading="lazy"
-          />
+        <div className="relative aspect-square overflow-hidden bg-slate-200">
+            {product.thumbnailUrl && (
+                <img
+                    src={product.thumbnailUrl}
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 w-full h-full object-cover filter blur-md scale-105"
+                />
+            )}
+            <img
+                src={product.imageUrl}
+                alt={product.name}
+                loading="lazy"
+                onLoad={(e) => { e.currentTarget.classList.add('opacity-100'); }}
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500 opacity-0"
+            />
+        </div>
           {hasDiscount && (
-              <div className={`absolute top-3 left-3 bg-red-500 text-white text-xs font-bold rounded-full px-2 py-1 transition-opacity duration-300 ${isImageLoaded ? 'opacity-100' : 'opacity-0'}`}>
+              <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold rounded-full px-2 py-1">
                   -{product.discount}%
               </div>
           )}
-        </div>
-        <div className={`absolute top-3 right-3 flex items-center gap-2 transition-opacity duration-300 ${isImageLoaded ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="absolute top-3 right-3 flex items-center gap-2">
           {product.rating > 0 && (
               <div className="flex items-center gap-1 text-sm font-bold bg-white/80 backdrop-blur-sm rounded-full px-2 py-1">
                   <StarIcon className="w-4 h-4 text-yellow-500" />
@@ -100,7 +105,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onProductClick }) =>
       </div>
       <div className="p-4 flex flex-col flex-grow">
         <div className="cursor-pointer" onClick={() => onProductClick(product)}>
-          <h3 className="text-base font-semibold text-slate-800 h-10">{product.name}</h3>
+          <h3 className="text-base font-semibold text-slate-800 min-h-[2.5rem]">{product.name}</h3>
            {product.weight && !isWeightBased && (
               <p className="text-sm text-slate-400 mt-1">{product.weight}</p>
             )}
@@ -133,7 +138,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onProductClick }) =>
                  <div className="w-full h-full flex items-center justify-center bg-slate-100 border-slate-200 text-slate-400 rounded-xl font-bold">
                     Нет в наличии
                  </div>
-            ) : quantity > 0 ? (
+            ) : quantity !== null && quantity > 0 ? (
                 <div className="w-full h-full flex items-center justify-between bg-slate-100 rounded-xl">
                     <button onClick={() => handleQuantityChange(quantity - step)} className="px-4 h-full text-slate-600 hover:text-brand-orange rounded-l-xl"><MinusIcon className="h-5 w-5"/></button>
                     <span className="font-bold text-lg text-slate-800 whitespace-nowrap">{quantity} {isWeightBased ? 'кг' : 'шт'}</span>

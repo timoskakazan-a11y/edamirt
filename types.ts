@@ -7,6 +7,7 @@ export interface Product {
   price: number;
   description: string;
   imageUrl: string;
+  thumbnailUrl?: string;
   rating: number;
   discount?: number;
   barcode?: string;

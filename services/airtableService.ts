@@ -356,21 +356,13 @@ const createNotification = async (notificationData: AirtableNotificationFields):
 };
 
 export const updateOrderStatus = async (orderId: string, status: OrderStatus, delay?: number): Promise<void> => {
-    // To prevent race conditions, fetch the full order details right before updating.
-    // This ensures we have the correct customer ID for notifications.
-    const orderDetails = status === 'доставлен' ? await getFullOrderDetails(orderId) : null;
-
-    if (status === 'доставлен' && !orderDetails) {
-        console.error(`Cannot create notification: failed to fetch details for order ${orderId} before status update.`);
-    }
-
-    // Prepare and send the actual status update
+    // First, perform the primary action: update the order status.
     const fieldsToUpdate: Partial<AirtableOrderFields> = { статус: status };
     if (delay) {
         fieldsToUpdate['время на доставку'] = delay;
     }
     if (status === 'доставлен' || status === 'отменен') {
-        fieldsToUpdate['работники'] = []; 
+        fieldsToUpdate['работники'] = []; // Unlink employee on completion/cancellation
     }
 
     const patchResponse = await fetch(`${ORDERS_BASE_URL}/${orderId}`, {
@@ -378,11 +370,23 @@ export const updateOrderStatus = async (orderId: string, status: OrderStatus, de
         headers: commonHeaders,
         body: JSON.stringify({ fields: fieldsToUpdate }),
     });
-    if (!patchResponse.ok) throw new Error(await patchResponse.text());
+
+    if (!patchResponse.ok) {
+        // If the status update itself fails, we must throw the error.
+        throw new Error(await patchResponse.text());
+    }
     
-    // If the update was successful and it was a delivery, create the notification
-    if (status === 'доставлен' && orderDetails) {
+    // If the update was successful and the status is 'доставлен', proceed to create a notification.
+    // This is a secondary action; if it fails, it will be logged but won't crash the flow.
+    if (status === 'доставлен') {
         try {
+            // Fetch the order details again to ensure we have all necessary info for the notification.
+            const orderDetails = await getFullOrderDetails(orderId);
+            if (!orderDetails) {
+                console.error(`Cannot create notification: failed to fetch details for order ${orderId} after status update.`);
+                return;
+            }
+
             const { customerId, totalAmount, createdAt } = orderDetails;
             if (!customerId) {
                 console.error(`Customer ID is missing for order ${orderId}, cannot create notification.`);
@@ -404,7 +408,6 @@ export const updateOrderStatus = async (orderId: string, status: OrderStatus, de
                 'Table 1': [customerId],
                 'иконка': [{ url: iconUrl }],
             });
-
         } catch (error) {
             console.error("Failed to create 'order delivered' notification after status update:", error);
         }
@@ -436,6 +439,7 @@ const mapAirtableRecordToProduct = (record: AirtableProductRecord): Product | nu
     if (!name || typeof fields.цена !== 'number') return null;
     
     const imageUrl = fields.Фото?.[0]?.thumbnails?.large?.url || fields.Фото?.[0]?.url || 'https://via.placeholder.com/300x200.png?text=No+Image';
+    const thumbnailUrl = fields.Фото?.[0]?.thumbnails?.small?.url;
     const discountPercentage = (fields['скидка'] || 0) * 100;
     
     const weightStatus = fields['статус по весу'] || 'поштучно';
@@ -457,6 +461,7 @@ const mapAirtableRecordToProduct = (record: AirtableProductRecord): Product | nu
       description: safeGetString(fields['Описание товара']) || 'No description available.',
       rating: fields['оценка товара'] || 0,
       imageUrl: imageUrl,
+      thumbnailUrl: thumbnailUrl,
       discount: discountPercentage,
       barcode: safeGetString(fields['штрихкод']),
       availableStock: fields['кол-во'] || 0,
@@ -681,14 +686,17 @@ export const updateProductRating = async (productId: string, newRatingValue: num
 // --- NOTIFICATION FUNCTIONS ---
 export const getNotificationsForUser = async (userId: string): Promise<Notification[]> => {
     const formula = encodeURIComponent(`FIND("${userId}", ARRAYJOIN({Table 1}))`);
-    const sortField = encodeURIComponent('время отправления');
-    const sortParams = `&sort%5B0%5D%5Bfield%5D=${sortField}&sort%5B0%5D%5Bdirection%5D=desc`;
-    const response = await fetch(`${NOTIFICATIONS_BASE_URL}?filterByFormula=${formula}${sortParams}`, noCacheFetchOptions);
+    // The sort field 'время отправления' was causing fetch errors, likely because it
+    // doesn't exist in the Airtable base. Switched to client-side sorting for robustness.
+    const response = await fetch(`${NOTIFICATIONS_BASE_URL}?filterByFormula=${formula}`, noCacheFetchOptions);
     if (!response.ok) {
         console.error("Airtable Error: Could not fetch notifications.", await response.text());
         return [];
     }
     const { records }: { records: AirtableNotificationRecord[] } = await response.json();
+    
+    // Sort by creation time client-side to ensure descending order.
+    records.sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
     
     return records.map(record => ({
         id: record.id,

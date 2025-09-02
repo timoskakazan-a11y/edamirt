@@ -154,7 +154,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                      setReviewableOrder({ ...latestOrderDetails, productsInfo: productsAwaitingReview });
                  } else {
                      setThankYouOrderId(latestOrderDetails.id);
-                     try { window.localStorage.setItem(THANK_YOU_ORDER_KEY, JSON.stringify({ id: latestOrderDetails.id, timestamp: Date.now() })); } catch (err) {/* ignore */}
+                     try { window.localStorage.setItem(THANK_YOU_ORDER_KEY, JSON.stringify({ id: latestOrderDetails.id, timestamp: Date.now() })); } catch (err) { console.error("Error saving thank you order to localStorage", err); }
                  }
               }
             }
@@ -223,6 +223,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const dismissReview = () => {
       if (reviewableOrder) {
           addDismissedOrder(reviewableOrder.id);
+          // Show thank you banner after dismissing review prompt.
+          setThankYouOrderId(reviewableOrder.id);
+          try {
+              window.localStorage.setItem(THANK_YOU_ORDER_KEY, JSON.stringify({ id: reviewableOrder.id, timestamp: Date.now() }));
+          } catch (err) {
+              console.error("Error saving thank you order to localStorage", err);
+          }
           setReviewableOrder(null);
       }
   };
@@ -247,7 +254,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 export const useOrder = (): OrderContextType => {
   const context = useContext(OrderContext);
   if (context === undefined) {
-    throw new Error('useOrder must be used within an OrderProvider');
+    throw new Error('useOrder must be used within a OrderProvider');
   }
   return context;
 };

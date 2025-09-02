@@ -251,14 +251,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   const cartCount = useMemo(() => {
-    // For weight-based items, we count them as 1 position in the cart, not the total weight
-    return inStockItems.reduce((count, item) => {
+    // For weight-based items, we count them as 1 position in the cart.
+    // For piece-based items, we sum the quantities.
+    // The total is rounded to produce a clean integer for the badge.
+    const total = inStockItems.reduce((count, item) => {
       const quantityInStock = Math.min(item.quantity, item.availableStock);
       if (item.weightStatus === 'на развес') {
           return quantityInStock > 0 ? count + 1 : count;
       }
       return count + quantityInStock;
     }, 0);
+    return Math.round(total);
   }, [inStockItems]);
 
   const value = {
