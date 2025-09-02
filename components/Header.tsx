@@ -1,25 +1,29 @@
-import React from 'react';
-import { useCart } from '../contexts/CartContext';
+import React, { useState } from 'react';
 import { useFavorites } from '../contexts/FavoritesContext';
-import ShoppingCartIcon from './icons/ShoppingCartIcon';
 import HeartIcon from './icons/HeartIcon';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
+import BellIcon from './icons/BellIcon';
+import NotificationsPanel from './NotificationsPanel';
 
-interface HeaderProps {
-  onCartClick: () => void;
-}
-
-const Header: React.FC<HeaderProps> = ({ onCartClick }) => {
-  const { cartCount } = useCart();
+const Header: React.FC = () => {
   const { favoritesCount, setShowFavoritesFilter } = useFavorites();
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const handleFavoritesClick = () => {
     setShowFavoritesFilter(true);
     document.querySelector('main')?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const formattedUnreadCount = () => {
+      if (unreadCount > 99) return '99+';
+      return unreadCount;
+  }
+
   return (
+    <>
     <header className="bg-white sticky top-0 z-40 border-b border-slate-200">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center">
@@ -46,20 +50,22 @@ const Header: React.FC<HeaderProps> = ({ onCartClick }) => {
             )}
           </button>
           <button
-            onClick={onCartClick}
+            onClick={() => setIsNotificationsOpen(prev => !prev)}
             className="relative text-slate-600 hover:text-brand-orange transition-colors duration-300"
-            aria-label="Open shopping cart"
+            aria-label="Open notifications"
           >
-            <ShoppingCartIcon className="h-8 w-8" />
-            {cartCount > 0 && (
+            <BellIcon className="h-8 w-8" />
+            {unreadCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-brand-orange text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                {cartCount}
+                {formattedUnreadCount()}
               </span>
             )}
           </button>
         </div>
       </div>
     </header>
+    <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
+    </>
   );
 };
 

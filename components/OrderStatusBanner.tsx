@@ -1,14 +1,16 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrder } from '../contexts/OrderContext';
 import { getFullOrderDetails } from '../services/airtableService';
-import type { OrderDetailsModalData } from '../types';
+import type { FullOrderDetails } from '../types';
 import OrderDetailsModal from './OrderDetailsModal';
 import StatusTracker from './StatusTracker';
 import ReviewModal from './ReviewModal';
 import { useProducts } from '../contexts/ProductContext';
 import XMarkIcon from './icons/XMarkIcon';
+import StarIcon from './icons/StarIcon';
 
 const calculateArrivalTime = (createdAt: string, deliveryTime: number): string => {
     const createdDate = new Date(createdAt);
@@ -19,9 +21,9 @@ const calculateArrivalTime = (createdAt: string, deliveryTime: number): string =
 };
 
 const OrderStatusBanner: React.FC = () => {
-    const { activeOrder, reviewableOrder, clearOrder, isRefetching } = useOrder();
+    const { activeOrder, reviewableOrder, clearOrder, dismissReview, isRefetching, thankYouOrderId, dismissThankYou } = useOrder();
     const { refetchProducts } = useProducts();
-    const [modalData, setModalData] = useState<OrderDetailsModalData | null>(null);
+    const [modalData, setModalData] = useState<FullOrderDetails | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -35,7 +37,17 @@ const OrderStatusBanner: React.FC = () => {
         }
     }, [activeOrder]);
 
-    if (!activeOrder && !reviewableOrder) {
+    useEffect(() => {
+        if (thankYouOrderId) {
+            const timer = setTimeout(() => {
+                dismissThankYou();
+            }, 5 * 60 * 1000); // 5 minutes
+
+            return () => clearTimeout(timer);
+        }
+    }, [thankYouOrderId, dismissThankYou]);
+
+    if (!activeOrder && !reviewableOrder && !thankYouOrderId) {
         return null;
     }
     
@@ -62,30 +74,66 @@ const OrderStatusBanner: React.FC = () => {
     };
 
     const bannerContent = () => {
+        if (thankYouOrderId) {
+            return (
+                <motion.div
+                    key="thank-you"
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                    transition={{ duration: 0.5, type: 'spring' }}
+                    className="w-full p-5 rounded-xl bg-gradient-to-tr from-green-500 to-emerald-400 text-white shadow-lg flex items-center justify-between gap-4"
+                >
+                    <div>
+                        <h3 className="text-xl font-extrabold tracking-tight">Заказ доставлен! 🫰</h3>
+                        <p className="text-sm text-white/90">Спасибо!</p>
+                    </div>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); dismissThankYou(); }}
+                        className="bg-white text-green-600 font-bold py-2.5 px-6 rounded-lg hover:bg-slate-100 transition-all duration-300 transform hover:scale-105 shadow-md"
+                    >
+                       ОК
+                    </button>
+                </motion.div>
+            );
+        }
+
         if (reviewableOrder) {
              return (
                 <motion.div
                     key="review"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="relative w-full p-6 rounded-xl text-center bg-blue-500 text-white"
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                    transition={{ duration: 0.5, type: 'spring' }}
+                    className="relative w-full p-5 rounded-xl bg-gradient-to-tr from-brand-orange to-yellow-400 text-white shadow-lg flex items-center justify-between gap-4 overflow-hidden"
                 >
-                    <p className="font-bold text-xl">Оцените товары!</p>
-                    <p className="text-sm opacity-90 mb-4">Помогите другим сделать правильный выбор.</p>
-                    <div className="flex justify-center gap-3">
-                        <button 
-                            onClick={() => clearOrder()} 
-                            className="bg-white/20 font-bold py-2 px-6 rounded-lg hover:bg-white/30 transition-colors"
+                    <StarIcon className="absolute -right-8 -top-8 w-40 h-40 text-white/10 transform rotate-12" />
+
+                    <div className="flex items-center gap-4 z-10">
+                        <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full hidden sm:block">
+                            <StarIcon className="w-10 h-10 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-extrabold tracking-tight">Оцените ваш заказ!</h3>
+                            <p className="text-sm text-white/90">Поделитесь впечатлениями о товарах.</p>
+                        </div>
+                    </div>
+                    <div className="z-10 flex-shrink-0">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsReviewModalOpen(true); }}
+                            className="bg-white text-brand-orange font-bold py-2.5 px-6 rounded-lg hover:bg-slate-100 transition-all duration-300 transform hover:scale-105 shadow-md"
                         >
-                           Не хочу
-                        </button>
-                        <button 
-                            onClick={() => setIsReviewModalOpen(true)} 
-                            className="bg-white text-blue-600 font-bold py-2 px-6 rounded-lg hover:bg-slate-100 transition-colors"
-                        >
-                           Оценить
+                           Начать
                         </button>
                     </div>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); dismissReview(); }}
+                        className="absolute top-2 right-2 bg-black/10 text-white/70 rounded-full p-1 hover:bg-black/30 z-20"
+                        aria-label="Скрыть"
+                    >
+                        <XMarkIcon className="h-4 w-4" />
+                    </button>
                 </motion.div>
             );
         }

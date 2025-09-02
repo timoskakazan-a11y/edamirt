@@ -23,7 +23,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, orderToRevie
 
   useEffect(() => {
     if (orderToReview) {
-      const reviewable = orderToReview.productsInfo.map(p => ({
+      const reviewable: ReviewableProduct[] = orderToReview.productsInfo.map(p => ({
         id: p.id,
         name: p.name,
         imageUrl: p.imageUrl
@@ -60,9 +60,8 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, orderToRevie
             оценка: rating,
             'текст отзыва': reviewText,
         });
-        // This is a fire-and-forget operation, we don't wait for it
-        // to avoid blocking the user flow.
-        updateProductRating(currentProduct.id); 
+        // Await the rating update to ensure it completes.
+        await updateProductRating(currentProduct.id, rating);
     } catch (error) {
         console.error("Failed to submit review:", error);
         alert("Не удалось отправить отзыв. Попробуйте позже.");

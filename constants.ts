@@ -9,6 +9,9 @@ export const AIRTABLE_PRODUCTS_TABLE_NAME = 'catalog';
 export const AIRTABLE_EMPLOYEES_TABLE_NAME = 'работники';
 export const AIRTABLE_ORDERS_TABLE_NAME = 'заказ';
 export const AIRTABLE_REVIEWS_TABLE_NAME = 'отзывы';
+export const AIRTABLE_BANNERS_TABLE_NAME = 'плашки';
+export const AIRTABLE_BETA_CENTER_TABLE_NAME = 'бета центр';
+export const AIRTABLE_NOTIFICATIONS_TABLE_NAME = 'уведомления';
 
 
 export const DELIVERY_ADDRESSES = [

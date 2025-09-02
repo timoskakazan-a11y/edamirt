@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import ProductList from './components/ProductList';
 import Cart from './components/Cart';
@@ -16,13 +15,29 @@ import { OrderProvider, useOrder } from './contexts/OrderContext';
 import AddressSelector from './components/AddressSelector';
 import { DELIVERY_ADDRESSES } from './constants';
 import OrderStatusBanner from './components/OrderStatusBanner';
+import ProductDetailModal from './components/ProductDetailModal';
+import type { Product } from './types';
+import Toast from './components/Toast';
+import BetaTestBanner from './components/BetaTestBanner';
+import BetaTestPage from './components/BetaTestPage';
+import { getBannerUrl } from './services/airtableService';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 const CustomerFlow: React.FC = () => {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [selectedAddress, setSelectedAddress] = useState(DELIVERY_ADDRESSES[0]);
-    const { activeOrder, isLoading: isOrderLoading } = useOrder();
+    const { activeOrder, reviewableOrder, isLoading: isOrderLoading } = useOrder();
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [isBetaPageOpen, setIsBetaPageOpen] = useState(false);
+    const [betaBannerUrl, setBetaBannerUrl] = useState<string | null>(null);
 
+
+    useEffect(() => {
+        getBannerUrl('beta тест')
+            .then(url => setBetaBannerUrl(url))
+            .catch(err => console.error("Failed to fetch beta banner:", err));
+    }, []);
 
     const handleOpenCheckout = () => {
         setIsCartOpen(false);
@@ -31,16 +46,17 @@ const CustomerFlow: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800">
-            <Header onCartClick={() => setIsCartOpen(true)} />
+            <Header />
             <main className="container mx-auto px-4 py-6">
+                {betaBannerUrl && <BetaTestBanner imageUrl={betaBannerUrl} onClick={() => setIsBetaPageOpen(true)} />}
                 {isOrderLoading ? (
                     <div className="h-24 mb-6 bg-slate-200 rounded-xl animate-pulse"></div>
-                ) : activeOrder ? (
+                ) : (activeOrder || reviewableOrder) ? (
                     <OrderStatusBanner />
                 ) : (
                     <AddressSelector selectedAddress={selectedAddress} onSelect={setSelectedAddress} />
                 )}
-                <ProductList />
+                <ProductList onProductClick={setSelectedProduct} />
             </main>
             <Cart isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} onCheckout={handleOpenCheckout} />
             <CheckoutModal 
@@ -48,25 +64,22 @@ const CustomerFlow: React.FC = () => {
                 onClose={() => setIsCheckoutOpen(false)} 
                 selectedAddress={selectedAddress}
             />
+            <ProductDetailModal 
+                product={selectedProduct}
+                isOpen={!!selectedProduct}
+                onClose={() => setSelectedProduct(null)}
+            />
             <FloatingCartBar onCartClick={() => setIsCartOpen(true)} />
+            <Toast />
+            <BetaTestPage isOpen={isBetaPageOpen} onClose={() => setIsBetaPageOpen(false)} />
         </div>
     )
 }
 
-const MemoizedCustomerFlow = React.memo(CustomerFlow);
-
 const AppContent: React.FC = () => {
   const { user, isAuthLoading } = useAuth();
-  const [isAppLoading, setIsAppLoading] = useState(true);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsAppLoading(false);
-    }, 2500); // Splash screen duration
-    return () => clearTimeout(timer);
-  }, []);
   
-  if (isAppLoading || isAuthLoading) {
+  if (isAuthLoading) {
     return <SplashScreen isLoading={true} />;
   }
   
@@ -84,7 +97,9 @@ const AppContent: React.FC = () => {
       <CartProvider>
         <FavoritesProvider>
            <OrderProvider>
-             <MemoizedCustomerFlow />
+             <NotificationProvider>
+                <CustomerFlow />
+             </NotificationProvider>
            </OrderProvider>
         </FavoritesProvider>
       </CartProvider>

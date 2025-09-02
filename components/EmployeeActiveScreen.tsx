@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import type { FullOrderDetails, OrderStatus } from '../types';
@@ -67,18 +68,40 @@ const EmployeeActiveScreen: React.FC<EmployeeActiveScreenProps> = ({ order, onSt
 
       <div className="flex-grow overflow-y-auto -mx-2 px-2 space-y-3">
         <h2 className="text-lg font-bold text-slate-800">Состав заказа:</h2>
-        {order.productsInfo.map((p, index) => (
-            <div key={index} className="flex gap-4 items-center bg-slate-50 p-3 rounded-lg">
-                <img src={p.imageUrl} alt={p.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
-                <div className="flex-grow">
-                    <p className="font-semibold text-slate-800">{p.name} - <span className="font-bold text-brand-orange">{p.quantity} шт.</span></p>
-                    <div className="flex items-center gap-2 text-slate-400 mt-1">
-                        <BarcodeIcon className="w-4 h-4" />
-                        <p className="text-xs font-mono tracking-wider">{p.barcode}</p>
-                    </div>
-                </div>
-            </div>
-        ))}
+        {order.productsInfo.map((p, index) => {
+            const isWeightBased = p.weightStatus === 'на развес';
+            const unit = isWeightBased ? 'кг' : 'шт';
+            const approxPieces = (isWeightBased && p.weightPerPiece && p.quantity > 0)
+                ? Math.round(p.quantity / p.weightPerPiece)
+                : 0;
+          
+            return (
+              <div key={index} className="flex gap-4 items-center bg-slate-50 p-3 rounded-lg">
+                  <img src={p.imageUrl} alt={p.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+                  <div className="flex-grow">
+                      <div className="flex justify-between items-start">
+                          <p className="font-semibold text-slate-800 pr-2">{p.name}</p>
+                          <p className="font-bold text-brand-orange text-lg whitespace-nowrap">{p.quantity} {unit}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between text-slate-500 mt-1">
+                          <div className="flex items-center gap-2 text-xs">
+                              {isWeightBased && approxPieces > 0 && (
+                                  <span className="font-medium bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">≈ {approxPieces} шт.</span>
+                              )}
+                              {!isWeightBased && p.weight && (
+                                  <span className="font-medium">{p.weight}</span>
+                              )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-400">
+                              <BarcodeIcon className="w-4 h-4" />
+                              <p className="text-xs font-mono tracking-wider">{p.barcode}</p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+            )
+        })}
       </div>
 
       <div className="flex-shrink-0 mt-4">

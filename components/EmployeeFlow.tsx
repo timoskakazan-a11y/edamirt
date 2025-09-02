@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import EmployeeSplashScreen from './EmployeeSplashScreen';
 import EmployeeReadyScreen from './EmployeeDashboard';
@@ -26,51 +28,58 @@ const EmployeeFlow: React.FC = () => {
     setTimeout(() => setIsShowingSplash(false), 2000);
   }, []);
 
-  const fetchActiveOrder = useCallback(async () => {
+  // Unified polling logic for fetching and assigning orders.
+  useEffect(() => {
     if (!user) return;
-    try {
-        const order = await getAssignedOrderForEmployee(user.id);
-        setActiveOrder(order);
 
-        if (order && status !== 'delivering') {
-            setStatus('delivering');
-        } else if (!order && status === 'delivering') {
-            setStatus('online');
+    let isMounted = true; // Prevent state updates on unmounted component
+
+    const poll = async () => {
+      try {
+        // 1. Always check for an already assigned order first.
+        const existingOrder = await getAssignedOrderForEmployee(user.id);
+        if (!isMounted) return;
+
+        if (existingOrder) {
+            setActiveOrder(existingOrder);
+            if (status !== 'delivering') setStatus('delivering');
+            return; // Found an order, job done for this poll cycle.
         }
-    } catch (err) {
-      console.error("Error fetching active order:", err);
-    }
-  }, [user, status]);
 
-  // This effect runs when the employee is online and not delivering,
-  // trying to pick up a queued order.
-  useEffect(() => {
-      let intervalId: number | undefined;
-      const assignQueuedOrder = async () => {
-          if (user && status === 'online' && !activeOrder) {
-              await findAndAssignQueuedOrder(user.id);
-              await fetchActiveOrder(); // Check immediately if an order was assigned
-          }
-      };
-      
-      if (status === 'online') {
-          assignQueuedOrder();
-          intervalId = window.setInterval(assignQueuedOrder, 10000); // Check for queued orders every 10 seconds
+        // 2. If no assigned order, and we are online, try to pick one from the queue.
+        if (status === 'online') {
+            const newOrder = await findAndAssignQueuedOrder(user.id);
+            if (!isMounted) return;
+
+            if (newOrder) {
+                setActiveOrder(newOrder);
+                setStatus('delivering');
+                return; // Got a new order, job done.
+            }
+        }
+        
+        // 3. If we reach here, there's no active order.
+        // If we previously had an order, clear it.
+        if (activeOrder) setActiveOrder(null); 
+        // If we thought we were delivering, switch status back to online.
+        if (status === 'delivering') setStatus('online');
+
+      } catch (err) {
+        console.error("Polling error in EmployeeFlow:", err);
       }
+    };
 
-      return () => clearInterval(intervalId);
-  }, [status, user, activeOrder, fetchActiveOrder]);
-  
-  // This effect runs when the employee is already delivering an order,
-  // to poll for status updates on that specific order.
-  useEffect(() => {
     let intervalId: number | undefined;
-    if (user && status === 'delivering') {
-      fetchActiveOrder(); // Initial fetch
-      intervalId = window.setInterval(fetchActiveOrder, 8000); // Poll for updates
+    if (status === 'online' || status === 'delivering') {
+        poll(); // Run once immediately
+        intervalId = window.setInterval(poll, 5000); // Poll every 5 seconds
     }
-    return () => clearInterval(intervalId);
-  }, [status, user, fetchActiveOrder]);
+
+    return () => {
+        isMounted = false;
+        if (intervalId) clearInterval(intervalId);
+    };
+  }, [user, status, activeOrder]);
 
 
   const handleStatusChange = async (newStatus: 'на линии' | 'не работает') => {
@@ -90,7 +99,10 @@ const EmployeeFlow: React.FC = () => {
   const handleUpdateOrderStatus = async (newStatus: OrderStatus, delay?: number) => {
     if (!activeOrder || !user) return;
     try {
+        // The service function now fetches necessary details internally,
+        // so we no longer need to pass notificationDetails.
         await updateOrderStatus(activeOrder.id, newStatus, delay);
+
         if (newStatus === 'доставлен' || newStatus === 'отменен') {
             setActiveOrder(null);
             setStatus('online'); // Go back to looking for new orders

@@ -1,4 +1,5 @@
 
+
 export interface Product {
   id: string;
   name: string;
@@ -10,6 +11,10 @@ export interface Product {
   discount?: number;
   barcode?: string;
   availableStock: number;
+  weight?: string;
+  weightStatus?: 'на развес' | 'поштучно';
+  pricePerKg?: number;
+  weightPerPiece?: number;
 }
 
 export interface CartItem extends Product {
@@ -78,10 +83,13 @@ export interface AirtableProductFields {
   скидка?: number;
   штрихкод?: any;
   'кол-во'?: number;
+  'вес'?: any;
+  'статус по весу'?: 'на развес' | 'поштучно';
+  'вес на шт'?: number;
 }
 
 export interface AirtableProductRecord {
-  id: string;
+  id:string;
   fields: AirtableProductFields;
 }
 
@@ -101,6 +109,7 @@ export interface Order {
   status: OrderStatus;
   address: string;
   createdAt: string;
+  employeeIds?: string[];
 }
 
 export interface OrderProductInfo {
@@ -109,25 +118,23 @@ export interface OrderProductInfo {
     imageUrl: string;
     barcode: string;
     quantity: number;
+    weightStatus?: 'на развес' | 'поштучно';
+    weightPerPiece?: number; // Weight in kg
+    weight?: string; // e.g. "500-700 г"
 }
 
 // The full order details for the courier
 export interface FullOrderDetails extends Order {
     productsInfo: OrderProductInfo[];
+    customerId: string;
 }
-
-export interface OrderDetailsModalData {
-    order: Order;
-    productsInfo: OrderProductInfo[];
-}
-
 
 // Represents the fields from the 'заказ' (orders) table
 export interface AirtableOrderFields {
   'номер заказа': string;
   'Table 1': string[]; // Link to customer
   'составляющие': string[]; // Link to products
-  'колво товаров': string;
+  'колво товаров'?: string;
   'сумма заказа': number;
   'время на доставку': number;
   статус: OrderStatus;
@@ -143,6 +150,12 @@ export interface AirtableOrderRecord {
 }
 
 // --- REVIEW TYPES ---
+export interface Review {
+    rating: number;
+    text?: string;
+    createdAt: string;
+}
+
 export interface AirtableReviewFields {
     почта: string;
     товар: string[]; // Record ID of the product
@@ -150,8 +163,53 @@ export interface AirtableReviewFields {
     'текст отзыва'?: string;
 }
 
+export interface AirtableReviewRecord {
+  id: string;
+  fields: AirtableReviewFields;
+  createdTime: string;
+}
+
+
 export interface ReviewableProduct {
     id: string;
     name: string;
     imageUrl: string;
+}
+
+// Banner Types
+export interface AirtableBannerFields {
+    Название: string;
+    Плашка: { url: string }[];
+}
+
+export interface AirtableBannerRecord {
+    id: string;
+    fields: AirtableBannerFields;
+}
+
+// Beta Feedback Types
+export interface AirtableBetaFeedbackFields {
+    'тема обращения': string;
+    текст: string;
+    'текст ошибки'?: string;
+}
+
+// --- NOTIFICATION TYPES ---
+export interface Notification {
+    id: string;
+    text: string;
+    iconUrl: string;
+    createdAt: string;
+}
+
+export interface AirtableNotificationFields {
+    'текст уведомления': string;
+    'иконка': { url: string }[];
+    'Table 1': string[]; // Link to Users
+}
+
+export interface AirtableNotificationRecord {
+    id: string;
+    fields: AirtableNotificationFields;
+    createdTime: string;
 }

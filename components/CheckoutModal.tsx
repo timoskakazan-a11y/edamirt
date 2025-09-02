@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,12 +17,15 @@ interface CheckoutModalProps {
 type FormState = 'idle' | 'loading' | 'success' | 'error';
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, selectedAddress }) => {
-  const { cartTotal, cartItems, finalizeOrder } = useCart();
+  const { cartTotal, cartItems, finalizeOrder, cartWeight } = useCart();
   const { user } = useAuth();
   const { refetchProducts } = useProducts();
-  const { activeOrder, refetchOrder } = useOrder();
+  const { activeOrder, setActiveOrderDirectly } = useOrder();
   const deliveryFee = cartItems.length > 0 ? 99.00 : 0;
   const finalTotal = cartTotal + deliveryFee;
+  const MAX_WEIGHT = 10;
+  const isOverweight = cartWeight > MAX_WEIGHT;
+
   
   const [formState, setFormState] = useState<FormState>('idle');
   const [errorMessage, setErrorMessage] = useState('');
@@ -35,10 +39,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, selected
         setFormState('error');
         return;
     }
+    
+    if (isOverweight) {
+        setErrorMessage(`Максимальный вес заказа ${MAX_WEIGHT} кг.`);
+        setFormState('error');
+        return;
+    }
 
     setFormState('loading');
     setErrorMessage('');
-    setSuccessMessage('Заказ принят!');
 
     if (!user?.id) {
         setErrorMessage('Ошибка: сессия пользователя не найдена.');
@@ -52,42 +61,35 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, selected
         throw new Error("Все товары в вашей корзине закончились.");
       }
       
-      await createOrder(user.id, itemsToPurchase, finalTotal, selectedAddress);
+      const newOrder = await createOrder(user.id, itemsToPurchase, finalTotal, selectedAddress);
       
       await updateProductStock(itemsToPurchase);
-      
       await refetchProducts();
+      
+      setActiveOrderDirectly(newOrder);
+
+      if (!newOrder.employeeIds || newOrder.employeeIds.length === 0) {
+          setSuccessMessage("Все курьеры заняты. Ваш заказ в очереди!");
+      } else {
+          setSuccessMessage('Заказ принят!');
+      }
 
       setFormState('success');
-      setTimeout(async () => {
+      setTimeout(() => {
         finalizeOrder();
-        await refetchOrder();
         handleClose();
       }, 3000);
 
     } catch (error) {
-       // This error is now just a notification, as orders are queued.
-      if (error instanceof Error && error.message.includes("нет свободных курьеров")) {
-          setSuccessMessage("Все курьеры заняты. Ваш заказ в очереди!");
-          // Proceed with success flow because the order IS created.
-          await updateProductStock(cartItems.filter(item => item.availableStock > 0));
-          await refetchProducts();
-          setFormState('success');
-          setTimeout(async () => {
-              finalizeOrder();
-              await refetchOrder();
-              handleClose();
-          }, 4000);
-      } else {
         setFormState('error');
         setErrorMessage(error instanceof Error ? error.message : 'Произошла неизвестная ошибка.');
-      }
     }
   };
 
   const handleClose = () => {
     setFormState('idle');
     setErrorMessage('');
+    setSuccessMessage('Заказ принят!');
     onClose();
   };
   
@@ -121,6 +123,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, selected
                             <span className="text-slate-600">Получатель</span>
                             <span className="font-semibold text-slate-800">{user?.name}</span>
                         </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-600">Общий вес</span>
+                            <span className={`font-semibold ${isOverweight ? 'text-red-600' : 'text-slate-800'}`}>{cartWeight.toFixed(2)} кг</span>
+                        </div>
                          <div className="flex justify-between items-center text-xl font-bold pt-3 border-t">
                             <span>Итог к оплате</span>
                             <span>{finalTotal.toFixed(0)} ₽</span>
@@ -129,13 +135,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, selected
 
                     {formState === 'error' && <p className="text-sm text-center text-red-600 mb-4">{errorMessage}</p>}
                     
-                    <button type="submit" disabled={formState === 'loading'} className="w-full bg-brand-orange text-white font-bold py-3 px-4 rounded-xl hover:bg-brand-orange-dark transition-all duration-300 text-lg shadow-md disabled:bg-slate-400 disabled:cursor-not-allowed flex justify-center items-center">
+                    <button type="submit" disabled={formState === 'loading' || isOverweight} className="w-full bg-brand-orange text-white font-bold py-3 px-4 rounded-xl hover:bg-brand-orange-dark transition-all duration-300 text-lg shadow-md disabled:bg-slate-400 disabled:cursor-not-allowed flex justify-center items-center">
                         {formState === 'loading' ? (
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                        ) : `Заказать за ${finalTotal.toFixed(0)} ₽`}
+                        ) : isOverweight ? 'Превышен лимит веса' : `Заказать за ${finalTotal.toFixed(0)} ₽`}
                     </button>
                 </form>
             )}

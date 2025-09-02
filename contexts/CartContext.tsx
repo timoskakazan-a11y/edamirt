@@ -1,9 +1,12 @@
 
+
 import React, { createContext, useContext, useState, useMemo, useEffect, useRef } from 'react';
 import type { Product, CartItem } from '../types';
 import { useProducts } from './ProductContext';
 import { useAuth } from './AuthContext';
 import { getUserCart, updateUserCart } from '../services/airtableService';
+
+const MAX_WEIGHT = 10; // 10 kg
 
 interface CartContextType {
   cartItems: CartItem[];
@@ -13,9 +16,11 @@ interface CartContextType {
   clearCart: () => void;
   cartCount: number;
   cartTotal: number;
+  cartWeight: number;
   finalizeOrder: () => void;
   adjustmentNotifications: Map<string, number>;
   isCartLoading: boolean;
+  toastMessage: string;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -27,6 +32,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [adjustmentNotifications, setAdjustmentNotifications] = useState<Map<string, number>>(new Map());
   const [isCartLoading, setIsCartLoading] = useState(true);
   const isInitialLoad = useRef(true);
+  const [toastMessage, setToastMessage] = useState('');
+  const toastTimerRef = useRef<number | null>(null);
+
+  const showToast = (message: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(message);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('');
+    }, 3500);
+  };
+
 
   // Load cart from Airtable on user login
   useEffect(() => {
@@ -114,31 +132,73 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const cartTotal = useMemo(() => {
     return inStockItems.reduce((total, item) => {
-      const price = (item.discount && item.discount > 0)
-        ? item.price * (1 - item.discount / 100)
-        : item.price;
-      return total + price * Math.min(item.quantity, item.availableStock);
+        let effectivePrice;
+        if (item.weightStatus === 'на развес' && item.pricePerKg) {
+            effectivePrice = item.pricePerKg;
+        } else {
+            effectivePrice = item.price;
+        }
+        
+        const priceWithDiscount = (item.discount && item.discount > 0)
+            ? effectivePrice * (1 - item.discount / 100)
+            : effectivePrice;
+
+        const itemQuantity = Math.min(item.quantity, item.availableStock);
+        const itemTotal = priceWithDiscount * itemQuantity;
+
+        return total + itemTotal;
+    }, 0);
+  }, [inStockItems]);
+
+  const cartWeight = useMemo(() => {
+    return inStockItems.reduce((total, item) => {
+        if (item.weightStatus === 'на развес') {
+            return total + item.quantity;
+        }
+        const itemWeight = (item.weightPerPiece || 0.5) * item.quantity;
+        return total + itemWeight;
     }, 0);
   }, [inStockItems]);
 
   const addToCart = (product: Product) => {
-    const existingItem = cartItems.find(item => item.id === product.id);
-    if (existingItem && existingItem.quantity >= product.availableStock) {
-      alert(`Извините, в наличии только ${product.availableStock} шт.`);
-      return;
+    let addAmount = 1;
+    if (product.weightStatus === 'на развес') {
+        // weightPerPiece is in kg.
+        if (product.weightPerPiece && product.weightPerPiece >= 1) { // >= 1kg
+            addAmount = 1;
+        } else if (product.weightPerPiece && product.weightPerPiece < 0.04) { // < 40g
+            addAmount = 0.1;
+        } else { // default for weight based
+            addAmount = 0.5;
+        }
     }
-    if (!existingItem && product.availableStock < 1) {
-       alert('Товара нет в наличии.');
+    
+    const potentialWeight = (product.weightStatus === 'на развес')
+        ? addAmount
+        : (product.weightPerPiece || 0.5) * addAmount;
+        
+    if (cartWeight + potentialWeight > MAX_WEIGHT) {
+        showToast(`Максимальный вес заказа ${MAX_WEIGHT} кг. Курьеру будет тяжело.`);
+        return;
+    }
+    
+    const existingItem = cartItems.find(item => item.id === product.id);
+    if (existingItem && (existingItem.quantity + addAmount) > product.availableStock) {
+        showToast(`Извините, в наличии только ${product.availableStock} ${product.weightStatus === 'на развес' ? 'кг' : 'шт'}.`);
+        return;
+    }
+    if (!existingItem && addAmount > product.availableStock) {
+       showToast('Товара нет в наличии.');
        return;
     }
 
     let newItems;
     if (existingItem) {
       newItems = cartItems.map(item =>
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        item.id === product.id ? { ...item, quantity: Number((item.quantity + addAmount).toFixed(2)) } : item
       );
     } else {
-      newItems = [...cartItems, { ...product, quantity: 1 }];
+      newItems = [...cartItems, { ...product, quantity: addAmount }];
     }
     setCartItems(newItems);
   };
@@ -151,12 +211,27 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateQuantity = (productId: string, quantity: number) => {
     const itemToUpdate = cartItems.find(item => item.id === productId);
     if (!itemToUpdate) return;
-
+  
+    const originalQuantity = itemToUpdate.quantity;
+  
+    // Only check weight limit if the quantity is increasing.
+    if (quantity > originalQuantity) {
+      const quantityDiff = quantity - originalQuantity;
+      const weightDiff = (itemToUpdate.weightStatus === 'на развес')
+        ? quantityDiff
+        : (itemToUpdate.weightPerPiece || 0.5) * quantityDiff;
+  
+      if (cartWeight + weightDiff > MAX_WEIGHT) {
+        showToast(`Максимальный вес заказа ${MAX_WEIGHT} кг. Курьеру будет тяжело.`);
+        return;
+      }
+    }
+  
     if (quantity > itemToUpdate.availableStock) {
-      alert(`Извините, в наличии только ${itemToUpdate.availableStock} шт.`);
+      showToast(`Извините, в наличии только ${itemToUpdate.availableStock} ${itemToUpdate.weightStatus === 'на развес' ? 'кг' : 'шт'}.`);
       quantity = itemToUpdate.availableStock;
     }
-
+  
     if (quantity <= 0) {
       removeFromCart(productId);
     } else {
@@ -176,7 +251,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   const cartCount = useMemo(() => {
-    return inStockItems.reduce((count, item) => count + Math.min(item.quantity, item.availableStock), 0);
+    // For weight-based items, we count them as 1 position in the cart, not the total weight
+    return inStockItems.reduce((count, item) => {
+      const quantityInStock = Math.min(item.quantity, item.availableStock);
+      if (item.weightStatus === 'на развес') {
+          return quantityInStock > 0 ? count + 1 : count;
+      }
+      return count + quantityInStock;
+    }, 0);
   }, [inStockItems]);
 
   const value = {
@@ -187,9 +269,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearCart,
     cartCount,
     cartTotal,
+    cartWeight,
     finalizeOrder,
     adjustmentNotifications,
-    isCartLoading
+    isCartLoading,
+    toastMessage
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { getSplashImages } from '../services/airtableService';
 
 interface SplashScreenProps {
   isLoading: boolean;
@@ -6,6 +7,20 @@ interface SplashScreenProps {
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ isLoading }) => {
   const logoText = "edamirt";
+  const [imageUrls, setImageUrls] = useState<{ orange: string | null; watermelon: string | null; ownerLogo: string | null }>({
+    orange: null,
+    watermelon: null,
+    ownerLogo: null,
+  });
+
+  useEffect(() => {
+    getSplashImages()
+      .then(urls => {
+        setImageUrls({ orange: urls.orangeUrl, watermelon: urls.watermelonUrl, ownerLogo: urls.ownerLogoUrl });
+      })
+      .catch(err => console.error("Failed to load splash images:", err));
+  }, []);
+
 
   return (
     <div
@@ -15,19 +30,23 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ isLoading }) => {
       aria-hidden={!isLoading}
     >
         <div className="relative text-center">
-          <img
-            src="https://i.postimg.cc/MTgC6dhr/4-1.png"
-            alt="Orange slice"
-            className="absolute -top-20 -left-16 w-32 opacity-0 animate-rollIn"
-            style={{ animationDelay: '800ms' }}
-          />
+          {imageUrls.orange && (
+            <img
+              src={imageUrls.orange}
+              alt="Orange slice"
+              className="absolute -top-32 -left-20 w-32 opacity-0 animate-rollIn"
+              style={{ animationDelay: '400ms' }}
+            />
+          )}
 
-          <img
-            src="https://i.postimg.cc/x8HWcLQj/3fc68a56c11d8aad0c3c7e2cacfd7a10.png"
-            alt="Watermelon slice"
-            className="absolute -bottom-24 -right-20 w-44 opacity-0 animate-popOut"
-            style={{ animationDelay: '1000ms' }}
-          />
+          {imageUrls.watermelon && (
+            <img
+              src={imageUrls.watermelon}
+              alt="Watermelon slice"
+              className="absolute -bottom-36 -right-24 w-44 opacity-0 animate-popOut"
+              style={{ animationDelay: '600ms' }}
+            />
+          )}
           
           <h1 className="text-6xl font-extrabold text-white cursor-default">
             {logoText.split('').map((char, index) => (
@@ -42,11 +61,19 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ isLoading }) => {
           </h1>
           <p 
               className="text-white text-base font-medium tracking-widest mt-2 opacity-0 animate-fadeInUp"
-              style={{ animationDelay: '800ms' }}
+              style={{ animationDelay: '600ms' }}
           >
               доставка продуктов
           </p>
         </div>
+        {imageUrls.ownerLogo && (
+            <img
+                src={imageUrls.ownerLogo}
+                alt="Owner Logo"
+                className="absolute bottom-8 w-24 opacity-0 animate-fadeInUp"
+                style={{ animationDelay: '800ms' }}
+            />
+        )}
     </div>
   );
 };

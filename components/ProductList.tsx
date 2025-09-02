@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Product } from '../types';
 import ProductCard from './ProductCard';
@@ -7,7 +8,11 @@ import HeartIcon from './icons/HeartIcon';
 
 const FAVORITES_CATEGORY = 'Избранное';
 
-const ProductList: React.FC = () => {
+interface ProductListProps {
+  onProductClick: (product: Product) => void;
+}
+
+const ProductList: React.FC<ProductListProps> = ({ onProductClick }) => {
   const { products: allProducts, isLoading, error } = useProducts();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -100,7 +105,7 @@ const ProductList: React.FC = () => {
       {filteredProducts.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 sm:gap-4">
           {filteredProducts.map(product => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
           ))}
         </div>
       ) : (

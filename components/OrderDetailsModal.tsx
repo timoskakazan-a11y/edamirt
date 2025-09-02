@@ -1,12 +1,12 @@
 
 import React from 'react';
-import type { OrderDetailsModalData } from '../types';
+import type { FullOrderDetails } from '../types';
 import XMarkIcon from './icons/XMarkIcon';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  data: OrderDetailsModalData | null;
+  data: FullOrderDetails | null;
   isLoading: boolean;
 }
 

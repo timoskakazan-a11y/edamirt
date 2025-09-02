@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, AirtableUserRecord, AirtableEmployeeRecord } from '../types';
 import { findUserByEmail, registerUser, findEmployeeByPassword, updateEmployeeStatus } from '../services/airtableService';
@@ -39,16 +38,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const storedUser = window.localStorage.getItem('authUser');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-    } catch (error) {
-        console.error("Could not retrieve user from localStorage:", error);
-    } finally {
+    // This promise simulates the process of checking for a stored user.
+    // It resolves immediately after checking localStorage.
+    const authCheckPromise = new Promise<void>(resolve => {
+        try {
+            const storedUser = window.localStorage.getItem('authUser');
+            if (storedUser) {
+                setUser(JSON.parse(storedUser));
+            }
+        } catch (error) {
+            console.error("Could not retrieve user from localStorage:", error);
+        }
+        resolve();
+    });
+
+    // This promise ensures the splash screen is visible for at least 2 seconds,
+    // matching the employee splash screen's duration for a consistent experience.
+    const minDisplayTimePromise = new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Wait for both the auth check to complete and the minimum display time to pass
+    // before hiding the splash screen.
+    Promise.all([authCheckPromise, minDisplayTimePromise]).finally(() => {
         setIsAuthLoading(false);
-    }
+    });
   }, []);
 
   const handleAuthSuccess = (record: AirtableUserRecord | AirtableEmployeeRecord, role: 'customer' | 'employee') => {
