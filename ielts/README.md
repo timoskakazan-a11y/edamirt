@@ -1,4 +1,4 @@
-# IELTS Prep — базовая структура сайта
+# Bridge to Ling (BTL) — базовая структура сайта
 
 Next.js (App Router), JavaScript. Папка `ielts/` в репозитории `edamirt`, которая не затрагивает существующее приложение в корне.
 
